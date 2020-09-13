@@ -13,15 +13,15 @@ var pieceScoreDict = {
     "k": -18,
     "p": 1
 };
-var boardScoreMultiplyer = [
-    [1.0,1.0025,1.0025,1.0025,1.0025,1.0025,1.0025,1.0],
-    [1.005,1.005,1.005,1.005,1.005,1.005,1.005,1.005],
-    [1.005,1.01,1.02,1.02,1.02,1.02,1.01,1.005],
-    [1.005,1.01,1.02,1.03,1.03,1.02,1.01,1.005],
-    [1.005,1.01,1.02,1.03,1.03,1.02,1.01,1.005],
-    [1.005,1.01,1.02,1.02,1.02,1.02,1.01,1.005],
-    [1.005,1.005,1.005,1.005,1.005,1.005,1.005,1.005],
-    [1.0,1.0025,1.0025,1.0025,1.0025,1.0025,1.0025,1.0],
+var boardScoreAdder = [
+    [0.0,0.1,0.1,0.1,0.1,0.1,0.1,0.0],
+    [0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4],
+    [0.4,0.6,0.8,0.8,0.8,0.8,0.6,0.4],
+    [0.4,0.6,0.8,1,1,0.8,0.6,0.4],
+    [0.4,0.6,0.8,1,1,0.8,0.6,0.4],
+    [0.4,0.6,0.8,0.8,0.8,0.8,0.6,0.4],
+    [0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4],
+    [0.0,0.1,0.1,0.1,0.1,0.1,0.1,0.0],
 ];
 
 function onDragStart (source, piece, position, orientation) {
@@ -39,12 +39,14 @@ function computerMakeMove () {
   // initialize alpha and beta for alpha-beta pruning
   alpha = -99999999
   beta = 99999999
-  bestMove = miniMax(possibleMoves, 1, true, alpha, beta).move;
+  TheMove = miniMax(possibleMoves, 1, true, alpha, beta);
 
   // game over
   if (possibleMoves.length === 0) return
 
-  game.move(bestMove);
+  console.log(TheMove);
+
+  game.move(TheMove.move);
   board.position(game.fen());
 }
 
@@ -52,54 +54,45 @@ function miniMax(possibleMoves, depth, isMax, alpha, beta) {
     var bestScore = null;
     var bestMove = null;
 
+    // To make the game unique, let's shuffle the possible moves before we score moves.
+    // Alpha beta pruning will always pick different moves due to the randomness.
+    possibleMoves = possibleMoves.sort(() => Math.random() - 0.5);
+
     for (var i = 0; i < possibleMoves.length; i++)
     {
         game.move(possibleMoves[i]);
-        var currentScore = getScore();
-        if (depth <= 5) {
-            currentScore = currentScore + miniMax(game.moves(), depth+1, !isMax, alpha, beta).score
+        if (depth < 4)
+        {
+          currentMoveScore = miniMax(game.moves(), depth+1, !isMax, alpha, beta).score;
+        }
+        else {
+          currentMoveScore = getScore();
         }
         game.undo();
-        if (bestScore === null)
-        {
-            bestScore = currentScore;
-            bestMove = possibleMoves[i];
-        }
-        
+
         if (isMax)
         {
-            if (currentScore > bestScore)
-            {
-                bestScore = currentScore;
-                bestMove = possibleMoves[i];
-            }
-            if (alpha < bestScore)
-            {
-                alpha = bestScore;
-            }
-            if (beta <= alpha)
-            {
-                console.log(alpha + " " + beta);
-                break;    
-            }
+          if (bestScore === null || currentMoveScore > bestScore)
+          {
+            bestScore = currentMoveScore;
+            alpha = bestScore;
+            bestMove = possibleMoves[i];
+          }
+          if (alpha >= beta)
+            break;
         }
-        else if (!isMax)
+        else if (!isMax )
         {
-            if (currentScore < bestScore)
-            {
-                bestScore = currentScore;
-                bestMove = possibleMoves[i];
-            }
-            if (beta > bestScore)
-            {
-                beta = bestScore
-            }
-            if (beta <= alpha)
-            {
-                console.log(alpha + " " + beta);
-                break;    
-            }
+          if (bestScore === null || currentMoveScore < bestScore)
+          {
+            bestScore = currentMoveScore;
+            beta = bestScore;
+            bestMove = possibleMoves[i];
+          }
+          if (beta <= alpha)
+            break;
         }
+
     }
     return { "move": bestMove, "score": bestScore };
 }
@@ -114,14 +107,14 @@ function getScore() {
             currPiece = theBoard[i][j];
             if (currPiece !== null)
             {
-                multiplier = boardScoreMultiplyer[i][j];
+                adder = boardScoreAdder[i][j];
                 if (currPiece.color === "b")
                 {
-                    score = score + (pieceScoreDict[currPiece.type] * multiplier);
+                    score = score + (pieceScoreDict[currPiece.type] + adder);
                 }
                 else if (currPiece.color === "w")
                 {
-                    score = score - (pieceScoreDict[currPiece.type] * multiplier);
+                    score = score - (pieceScoreDict[currPiece.type] + adder);
                 }
             }
         }
@@ -141,7 +134,7 @@ function onDrop (source, target) {
   // illegal move
   if (move === null) return 'snapback'
 
-  // make random legal move for black
+  // make legal move for black
   window.setTimeout(computerMakeMove, 250)
 }
 
